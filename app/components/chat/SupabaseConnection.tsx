@@ -19,7 +19,6 @@ export function SupabaseConnection() {
     handleDisconnect,
     selectProject,
     handleCreateProject,
-    updateToken,
     isConnected,
     fetchProjectApiKeys,
   } = useSupabaseConnection();
@@ -113,35 +112,7 @@ export function SupabaseConnection() {
                   Connect to Supabase
                 </DialogTitle>
 
-                <div>
-                  <label className="block text-sm text-bolt-elements-textSecondary mb-2">Access Token</label>
-                  <input
-                    type="password"
-                    value={supabaseConn.token}
-                    onChange={(e) => updateToken(e.target.value)}
-                    disabled={connecting}
-                    placeholder="Enter your Supabase access token"
-                    className={classNames(
-                      'w-full px-3 py-2 rounded-lg text-sm',
-                      'bg-[#F8F8F8] dark:bg-[#1A1A1A]',
-                      'border border-[#E5E5E5] dark:border-[#333333]',
-                      'text-bolt-elements-textPrimary placeholder-bolt-elements-textTertiary',
-                      'focus:outline-none focus:ring-1 focus:ring-[#3ECF8E]',
-                      'disabled:opacity-50',
-                    )}
-                  />
-                  <div className="mt-2 text-sm text-bolt-elements-textSecondary">
-                    <a
-                      href="https://app.supabase.com/account/tokens"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[#3ECF8E] hover:underline inline-flex items-center gap-1"
-                    >
-                      Get your token
-                      <div className="i-ph:arrow-square-out w-4 h-4" />
-                    </a>
-                  </div>
-                </div>
+                {/* 移除 AccessKey/AccessSecret 输入框 */}
 
                 <div className="flex justify-end gap-2 mt-6">
                   <DialogClose asChild>
@@ -149,7 +120,7 @@ export function SupabaseConnection() {
                   </DialogClose>
                   <button
                     onClick={handleConnect}
-                    disabled={connecting || !supabaseConn.token}
+                    disabled={connecting}
                     className={classNames(
                       'px-4 py-2 rounded-lg text-sm flex items-center gap-2',
                       'bg-[#3ECF8E] text-white',

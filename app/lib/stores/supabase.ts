@@ -1,5 +1,5 @@
 import { atom } from 'nanostores';
-import type { SupabaseUser, SupabaseStats, SupabaseApiKey, SupabaseCredentials } from '~/types/supabase';
+import type { SupabaseUser, SupabaseStats, SupabaseCredentials } from '~/types/supabase';
 
 export interface SupabaseProject {
   id: string;
@@ -7,6 +7,7 @@ export interface SupabaseProject {
   region: string;
   organization_id: string;
   status: string;
+  supabaseUrl?: string; // 添加 supabaseUrl 字段
   database?: {
     host: string;
     version: string;
@@ -24,6 +25,8 @@ export interface SupabaseConnectionState {
   isConnected?: boolean;
   project?: SupabaseProject;
   credentials?: SupabaseCredentials;
+  accessKey?: string; // 新增
+  accessSecret?: string; // 新增
 }
 
 const savedConnection = typeof localStorage !== 'undefined' ? localStorage.getItem('supabase_connection') : null;
@@ -61,6 +64,19 @@ export const isFetchingApiKeys = atom(false);
 export function updateSupabaseConnection(connection: Partial<SupabaseConnectionState>) {
   const currentState = supabaseConnection.get();
 
+  console.log('=== updateSupabaseConnection 开始 ===');
+  console.log('当前状态:', JSON.stringify(currentState, null, 2));
+  console.log('更新数据:', JSON.stringify(connection, null, 2));
+
+  // 新增：accessKey/accessSecret 合并
+  if (connection.accessKey === undefined) {
+    connection.accessKey = currentState.accessKey;
+  }
+
+  if (connection.accessSecret === undefined) {
+    connection.accessSecret = currentState.accessSecret;
+  }
+
   if (connection.user !== undefined || connection.token !== undefined) {
     const newUser = connection.user !== undefined ? connection.user : currentState.user;
     const newToken = connection.token !== undefined ? connection.token : currentState.token;
@@ -92,12 +108,20 @@ export function updateSupabaseConnection(connection: Partial<SupabaseConnectionS
   }
 
   const newState = { ...currentState, ...connection };
+  console.log('更新后的状态:', JSON.stringify(newState, null, 2));
   supabaseConnection.set(newState);
 
   /*
    * Always save the connection state to localStorage to persist across chats
    */
-  if (connection.user || connection.token || connection.selectedProjectId !== undefined || connection.credentials) {
+  if (
+    connection.user ||
+    connection.token ||
+    connection.selectedProjectId !== undefined ||
+    connection.credentials ||
+    connection.accessKey ||
+    connection.accessSecret
+  ) {
     localStorage.setItem('supabase_connection', JSON.stringify(newState));
 
     if (newState.credentials) {
@@ -144,44 +168,65 @@ export async function fetchSupabaseStats(token: string) {
   }
 }
 
-export async function fetchProjectApiKeys(projectId: string, token: string) {
+export async function fetchProjectApiKeys(projectId: string) {
   isFetchingApiKeys.set(true);
 
   try {
-    const response = await fetch('/api/supabase/variables', {
+    console.log('=== fetchProjectApiKeys 开始 ===');
+    console.log('项目ID:', projectId);
+
+    // 1. 从项目数据中获取 supabaseUrl
+    const currentState = supabaseConnection.get();
+    console.log('当前连接状态:', JSON.stringify(currentState, null, 2));
+
+    const project = currentState.stats?.projects?.find((p) => p.id === projectId);
+    console.log('找到的项目:', JSON.stringify(project, null, 2));
+
+    const supabaseUrl = project?.supabaseUrl || '';
+    console.log('提取的 supabaseUrl:', supabaseUrl);
+
+    if (!supabaseUrl) {
+      console.warn('项目数据中没有找到 supabaseUrl，请检查阿里云 API 返回的数据结构');
+    }
+
+    // 2. 调用后端接口获取API Keys
+    console.log('调用 /api/supabase/apikeys 接口...');
+
+    const response = await fetch('/api/supabase/apikeys', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        projectId,
-        token,
-      }),
+      body: JSON.stringify({ projectId }),
     });
 
     if (!response.ok) {
-      throw new Error('Failed to fetch API keys');
+      throw new Error('Failed to fetch project API keys');
     }
 
     const data = (await response.json()) as any;
-    const apiKeys = data.apiKeys;
+    console.log('API Keys 接口返回:', JSON.stringify(data, null, 2));
 
-    const anonKey = apiKeys.find((key: SupabaseApiKey) => key.name === 'anon' || key.name === 'public');
+    const anonKey = data.anonKey;
+    const serviceRoleKey = data.serviceRoleKey;
 
-    if (anonKey) {
-      const supabaseUrl = `https://${projectId}.supabase.co`;
+    console.log('准备更新连接状态，credentials:', {
+      anonKey: !!anonKey,
+      serviceRoleKey: !!serviceRoleKey,
+      supabaseUrl: !!supabaseUrl,
+    });
 
-      updateSupabaseConnection({
-        credentials: {
-          anonKey: anonKey.api_key,
-          supabaseUrl,
-        },
-      });
+    updateSupabaseConnection({
+      credentials: {
+        anonKey,
+        serviceRoleKey,
+        supabaseUrl,
+      },
+    });
 
-      return { anonKey: anonKey.api_key, supabaseUrl };
-    }
+    console.log('=== fetchProjectApiKeys 完成 ===');
 
-    return null;
+    return { anonKey, serviceRoleKey, supabaseUrl };
   } catch (error) {
     console.error('Failed to fetch project API keys:', error);
     throw error;

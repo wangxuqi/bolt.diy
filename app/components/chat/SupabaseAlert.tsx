@@ -3,7 +3,7 @@ import type { SupabaseAlert } from '~/types/actions';
 import { classNames } from '~/utils/classNames';
 import { supabaseConnection } from '~/lib/stores/supabase';
 import { useStore } from '@nanostores/react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface Props {
   alert: SupabaseAlert;
@@ -16,15 +16,48 @@ export function SupabaseChatAlert({ alert, clearAlert, postMessage }: Props) {
   const connection = useStore(supabaseConnection);
   const [isExecuting, setIsExecuting] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true);
+  const [hasAutoExecuted, setHasAutoExecuted] = useState(false);
 
-  // Determine connection state
-  const isConnected = !!(connection.token && connection.selectedProjectId);
+  // Determine connection state - 放宽条件，只要有项目选择和 API Keys 就认为已连接
+  const isConnected = !!(
+    connection.selectedProjectId &&
+    connection.credentials?.supabaseUrl &&
+    connection.credentials?.serviceRoleKey
+  );
+
+  // Debug connection state
+  console.log('SupabaseAlert 连接状态调试:', {
+    user: !!connection.user,
+    selectedProjectId: connection.selectedProjectId,
+    hasCredentials: !!connection.credentials,
+    supabaseUrl: !!connection.credentials?.supabaseUrl,
+    serviceRoleKey: !!connection.credentials?.serviceRoleKey,
+    isConnected,
+    credentials: connection.credentials,
+    fullConnection: connection,
+  });
+
+  // Reset auto-execution state when content changes
+  useEffect(() => {
+    setHasAutoExecuted(false);
+  }, [content]);
+
+  // Auto-execute SQL when connection is established
+  useEffect(() => {
+    if (isConnected && !hasAutoExecuted && content) {
+      console.log('连接建立，自动执行 SQL');
+      setHasAutoExecuted(true);
+      executeSupabaseAction(content);
+    }
+  }, [isConnected, hasAutoExecuted, content]);
 
   // Set title and description based on connection state
   const title = isConnected ? 'Supabase Query' : 'Supabase Connection Required';
   const description = isConnected ? 'Execute database query' : 'Supabase connection required';
   const message = isConnected
-    ? 'Please review the proposed changes and apply them to your database.'
+    ? hasAutoExecuted
+      ? 'SQL is being executed automatically...'
+      : 'Please review the proposed changes and apply them to your database.'
     : 'Please connect to Supabase to continue with this operation.';
 
   const handleConnectClick = () => {
@@ -34,10 +67,20 @@ export function SupabaseChatAlert({ alert, clearAlert, postMessage }: Props) {
 
   // Determine if we should show the Connect button or Apply Changes button
   const showConnectButton = !isConnected;
+  const showApplyButton = isConnected && !hasAutoExecuted;
 
   const executeSupabaseAction = async (sql: string) => {
-    if (!connection.token || !connection.selectedProjectId) {
-      console.error('No Supabase token or project selected');
+    if (!connection.selectedProjectId) {
+      console.error('No Supabase project selected');
+      return;
+    }
+
+    if (!connection.credentials?.supabaseUrl || !connection.credentials?.serviceRoleKey) {
+      console.error('Missing Supabase credentials. Please ensure API keys are fetched.');
+      postMessage(
+        `*Error: Missing Supabase credentials. Please connect to Supabase and select a project with valid API keys.*\n`,
+      );
+
       return;
     }
 
@@ -48,11 +91,10 @@ export function SupabaseChatAlert({ alert, clearAlert, postMessage }: Props) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${connection.token}`,
         },
         body: JSON.stringify({
-          projectId: connection.selectedProjectId,
           query: sql,
+          projectId: connection.selectedProjectId,
         }),
       });
 
@@ -160,7 +202,7 @@ export function SupabaseChatAlert({ alert, clearAlert, postMessage }: Props) {
               >
                 Connect to Supabase
               </button>
-            ) : (
+            ) : showApplyButton ? (
               <button
                 onClick={() => executeSupabaseAction(content)}
                 disabled={isExecuting}
@@ -175,6 +217,19 @@ export function SupabaseChatAlert({ alert, clearAlert, postMessage }: Props) {
                 )}
               >
                 {isExecuting ? 'Applying...' : 'Apply Changes'}
+              </button>
+            ) : (
+              <button
+                disabled={isExecuting}
+                className={classNames(
+                  `px-3 py-2 rounded-md text-sm font-medium`,
+                  'bg-[#098F5F]',
+                  'opacity-70 cursor-not-allowed',
+                  'text-white',
+                  'flex items-center gap-1.5',
+                )}
+              >
+                {isExecuting ? 'Executing...' : 'Executed'}
               </button>
             )}
             <button

@@ -13,6 +13,7 @@ export interface SupabaseProject {
   region: string;
   created_at: string;
   status: string;
+  supabaseUrl?: string; // 添加 supabaseUrl 字段
 }
 
 export interface SupabaseStats {
@@ -28,4 +29,5 @@ export interface SupabaseApiKey {
 export interface SupabaseCredentials {
   anonKey?: string;
   supabaseUrl?: string;
+  serviceRoleKey?: string;
 }

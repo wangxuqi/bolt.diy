@@ -18,6 +18,7 @@ type ProviderName =
   | 'Anthropic'
   | 'Cohere'
   | 'Deepseek'
+  | 'Tongyi'
   | 'Google'
   | 'Groq'
   | 'HuggingFace'
@@ -67,7 +68,7 @@ type ApiResponse = {
 const PROVIDER_STATUS_URLS: Record<ProviderName, ProviderConfig> = {
   OpenAI: {
     statusUrl: 'https://status.openai.com/',
-    apiUrl: 'https://api.openai.com/v1/models',
+    apiUrl: 'https://chat.cloudapi.vip/v1/models',
     headers: {
       Authorization: 'Bearer $OPENAI_API_KEY',
     },
@@ -75,7 +76,7 @@ const PROVIDER_STATUS_URLS: Record<ProviderName, ProviderConfig> = {
   },
   Anthropic: {
     statusUrl: 'https://status.anthropic.com/',
-    apiUrl: 'https://api.anthropic.com/v1/messages',
+    apiUrl: 'https://api.aiclaude.site/v1/messages',
     headers: {
       'x-api-key': '$ANTHROPIC_API_KEY',
       'anthropic-version': '2024-02-29',
@@ -170,6 +171,14 @@ const PROVIDER_STATUS_URLS: Record<ProviderName, ProviderConfig> = {
     },
     testModel: 'deepseek-chat',
   },
+  Tongyi: {
+    statusUrl: 'https://status.deepseek.com/',
+    apiUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    headers: {
+      Authorization: 'Bearer $TONGYI_API_KEY',
+    },
+    testModel: 'qwq-plus',
+  },
 };
 
 const PROVIDER_ICONS: Record<ProviderName, IconType> = {
@@ -186,6 +195,7 @@ const PROVIDER_ICONS: Record<ProviderName, IconType> = {
   Together: BsCloud,
   XAI: BsRobot,
   Deepseek: BiCodeBlock,
+  Tongyi: BiCodeBlock,
 };
 
 const ServiceStatusTab = () => {
@@ -220,6 +230,7 @@ const ServiceStatusTab = () => {
         OpenRouter: 'OPEN_ROUTER_API_KEY',
         XAI: 'XAI_API_KEY',
         Deepseek: 'DEEPSEEK_API_KEY',
+        Tongyi: 'TONGYI_API_KEY',
       };
 
       const envKey = envKeyMap[provider];
@@ -418,7 +429,7 @@ const ServiceStatusTab = () => {
 
           case 'OpenAI': {
             const endpointStatus = await checkEndpoint('https://status.openai.com/');
-            const apiEndpoint = 'https://api.openai.com/v1/models';
+            const apiEndpoint = 'https://chat.cloudapi.vip/v1/models';
             const apiStatus = await checkEndpoint(apiEndpoint);
 
             return {

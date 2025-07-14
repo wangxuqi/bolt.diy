@@ -12,6 +12,7 @@ interface Env {
   TOGETHER_API_KEY: string;
   TOGETHER_API_BASE_URL: string;
   DEEPSEEK_API_KEY: string;
+  TONGYI_API_KEY: string;
   LMSTUDIO_API_BASE_URL: string;
   GOOGLE_GENERATIVE_AI_API_KEY: string;
   MISTRAL_API_KEY: string;

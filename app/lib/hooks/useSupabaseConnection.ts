@@ -32,8 +32,9 @@ export function useSupabaseConnection() {
 
       updateSupabaseConnection(parsed);
 
-      if (parsed.token && parsed.selectedProjectId && !parsed.credentials) {
-        fetchProjectApiKeys(parsed.selectedProjectId, parsed.token).catch(console.error);
+      if (parsed.selectedProjectId && !parsed.credentials) {
+        console.log('初始化时自动获取项目 API Keys:', parsed.selectedProjectId);
+        fetchProjectApiKeys(parsed.selectedProjectId).catch(console.error);
       }
     }
   }, []);
@@ -42,7 +43,8 @@ export function useSupabaseConnection() {
     isConnecting.set(true);
 
     try {
-      const cleanToken = connection.token.trim();
+      const cleanAccessKey = (connection.accessKey || '').trim();
+      const cleanAccessSecret = (connection.accessSecret || '').trim();
 
       const response = await fetch('/api/supabase', {
         method: 'POST',
@@ -50,7 +52,8 @@ export function useSupabaseConnection() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          token: cleanToken,
+          accessKey: cleanAccessKey,
+          accessSecret: cleanAccessSecret,
         }),
       });
 
@@ -62,7 +65,8 @@ export function useSupabaseConnection() {
 
       updateSupabaseConnection({
         user: data.user,
-        token: connection.token,
+        accessKey: connection.accessKey,
+        accessSecret: connection.accessSecret,
         stats: data.stats,
       });
 
@@ -95,6 +99,7 @@ export function useSupabaseConnection() {
 
     if (projectId && currentState.stats?.projects) {
       projectData = currentState.stats.projects.find((project) => project.id === projectId);
+      console.log('找到项目数据:', JSON.stringify(projectData, null, 2));
     }
 
     updateSupabaseConnection({
@@ -102,10 +107,14 @@ export function useSupabaseConnection() {
       project: projectData,
     });
 
-    if (projectId && currentState.token) {
+    // 自动获取 API Keys
+    if (projectId) {
       try {
-        await fetchProjectApiKeys(projectId, currentState.token);
-        toast.success('Project selected successfully');
+        console.log('开始自动获取项目 API Keys:', projectId);
+
+        const result = await fetchProjectApiKeys(projectId);
+        console.log('API Keys 获取结果:', JSON.stringify(result, null, 2));
+        toast.success('Project selected and API keys fetched successfully');
       } catch (error) {
         console.error('Failed to fetch API keys:', error);
         toast.error('Selected project but failed to fetch API keys');
@@ -118,7 +127,8 @@ export function useSupabaseConnection() {
   };
 
   const handleCreateProject = async () => {
-    window.open('https://app.supabase.com/new/new-project', '_blank');
+    const regionId = process.env.ALIBABA_CLOUD_REGION_ID || 'cn-beijing';
+    window.open(`https://gpdbnext.console.aliyun.com/gpdb/${regionId}/supabase`, '_blank');
   };
 
   return {
@@ -134,14 +144,15 @@ export function useSupabaseConnection() {
     handleDisconnect,
     selectProject,
     handleCreateProject,
-    updateToken: (token: string) => updateSupabaseConnection({ ...connection, token }),
-    isConnected: !!(connection.user && connection.token),
+    updateToken: (payload: { accessKey?: string; accessSecret?: string }) => {
+      updateSupabaseConnection({
+        ...connection,
+        ...payload,
+      });
+    },
+    isConnected: !!(connection.user && connection.selectedProjectId),
     fetchProjectApiKeys: (projectId: string) => {
-      if (connection.token) {
-        return fetchProjectApiKeys(projectId, connection.token);
-      }
-
-      return Promise.reject(new Error('No token available'));
+      return fetchProjectApiKeys(projectId);
     },
   };
 }
