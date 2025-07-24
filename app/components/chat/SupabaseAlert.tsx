@@ -24,18 +24,6 @@ export function SupabaseChatAlert({ alert, clearAlert, postMessage }: Props) {
     connection.credentials?.serviceRoleKey
   );
 
-  // Debug connection state
-  console.log('SupabaseAlert 连接状态调试:', {
-    user: !!connection.user,
-    selectedProjectId: connection.selectedProjectId,
-    hasCredentials: !!connection.credentials,
-    supabaseUrl: !!connection.credentials?.supabaseUrl,
-    serviceRoleKey: !!connection.credentials?.serviceRoleKey,
-    isConnected,
-    credentials: connection.credentials,
-    fullConnection: connection,
-  });
-
   // Set title and description based on connection state
   const title = isConnected ? 'Supabase Query' : 'Supabase Connection Required';
   const description = isConnected ? 'Execute database query' : 'Supabase connection required';
