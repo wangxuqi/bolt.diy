@@ -81,6 +81,24 @@ async function handleProxyRequest(request: Request, path: string | undefined) {
     const domain = parts[1];
     const remainingPath = parts[2] || '';
 
+    // Validate domain to prevent open redirect attacks
+    const ALLOWED_DOMAINS = [
+      'github.com',
+      'gitlab.com',
+      'bitbucket.org',
+      'raw.githubusercontent.com',
+      'gist.githubusercontent.com'
+    ];
+    
+    const domainLowerCase = domain.toLowerCase();
+    const isAllowedDomain = ALLOWED_DOMAINS.some(allowedDomain => 
+      domainLowerCase === allowedDomain || domainLowerCase.endsWith('.' + allowedDomain)
+    );
+    
+    if (!isAllowedDomain) {
+      return json({ error: 'Domain not allowed for security reasons' }, { status: 403 });
+    }
+
     // Reconstruct the target URL with query parameters
     const url = new URL(request.url);
     const targetURL = `https://${domain}/${remainingPath}${url.search}`;

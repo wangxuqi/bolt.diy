@@ -27,10 +27,21 @@ function parseCookies(cookieHeader: string): Record<string, string> {
   items.forEach((item) => {
     const [name, ...rest] = item.split('=');
 
-    if (name && rest) {
-      const decodedName = decodeURIComponent(name.trim());
-      const decodedValue = decodeURIComponent(rest.join('=').trim());
-      cookies[decodedName] = decodedValue;
+    if (name && rest.length > 0) {
+      try {
+        const decodedName = decodeURIComponent(name.trim());
+        const decodedValue = decodeURIComponent(rest.join('=').trim());
+        
+        // Validate cookie name and value to prevent injection
+        if (decodedName.length > 0 && decodedName.length < 256 && 
+            decodedValue.length < 4096 && 
+            !/[<>\"'&\x00-\x1f\x7f-\x9f]/.test(decodedValue)) {
+          cookies[decodedName] = decodedValue;
+        }
+      } catch (error) {
+        // Skip malformed cookies
+        console.warn('Malformed cookie detected and skipped:', name);
+      }
     }
   });
 
@@ -56,10 +67,30 @@ async function chatAction({ context, request }: ActionFunctionArgs) {
   }>();
 
   const cookieHeader = request.headers.get('Cookie');
-  const apiKeys = JSON.parse(parseCookies(cookieHeader || '').apiKeys || '{}');
-  const providerSettings: Record<string, IProviderSetting> = JSON.parse(
-    parseCookies(cookieHeader || '').providers || '{}',
-  );
+  
+  // Safely parse API keys from cookies
+  let apiKeys = {};
+  try {
+    const apiKeysString = parseCookies(cookieHeader || '').apiKeys;
+    if (apiKeysString && apiKeysString.trim().startsWith('{') && apiKeysString.trim().endsWith('}')) {
+      apiKeys = JSON.parse(apiKeysString);
+    }
+  } catch (error) {
+    logger.warn('Failed to parse apiKeys from cookies:', error);
+    apiKeys = {};
+  }
+  
+  // Safely parse provider settings from cookies
+  let providerSettings: Record<string, IProviderSetting> = {};
+  try {
+    const providersString = parseCookies(cookieHeader || '').providers;
+    if (providersString && providersString.trim().startsWith('{') && providersString.trim().endsWith('}')) {
+      providerSettings = JSON.parse(providersString);
+    }
+  } catch (error) {
+    logger.warn('Failed to parse providers from cookies:', error);
+    providerSettings = {};
+  }
 
   const stream = new SwitchableStream();
 

@@ -12,6 +12,23 @@ import type { FileHistory } from '~/types/actions';
 import { getLanguageFromExtension } from '~/utils/getLanguageFromExtension';
 import { themeStore } from '~/lib/stores/theme';
 
+// HTML sanitization function to prevent XSS
+function sanitizeHTML(html: string): string {
+  // Allow only safe HTML tags and attributes for syntax highlighting
+  const allowedTags = ['span', 'div'];
+  const allowedAttributes = ['class', 'style'];
+  
+  return html
+    .replace(/<script[^>]*>.*?<\/script>/gi, '')
+    .replace(/<iframe[^>]*>.*?<\/iframe>/gi, '')
+    .replace(/<object[^>]*>.*?<\/object>/gi, '')
+    .replace(/<embed[^>]*>/gi, '')
+    .replace(/on\w+\s*=\s*["'][^"']*["']/gi, '')
+    .replace(/javascript:/gi, '')
+    .replace(/vbscript:/gi, '')
+    .replace(/data:/gi, '');
+}
+
 interface CodeComparisonProps {
   beforeCode: string;
   afterCode: string;
@@ -376,14 +393,14 @@ const NoChangesView = memo(
                 <span
                   dangerouslySetInnerHTML={{
                     __html: highlighter
-                      ? highlighter
+                      ? sanitizeHTML(highlighter
                           .codeToHtml(line, {
                             lang: language,
                             theme: theme === 'dark' ? 'github-dark' : 'github-light',
                           })
                           .replace(/<\/?pre[^>]*>/g, '')
-                          .replace(/<\/?code[^>]*>/g, '')
-                      : line,
+                          .replace(/<\/?code[^>]*>/g, ''))
+                      : sanitizeHTML(line),
                   }}
                 />
               </div>
@@ -424,11 +441,11 @@ const CodeLine = memo(
     const renderContent = () => {
       if (type === 'unchanged' || !block.charChanges) {
         const highlightedCode = highlighter
-          ? highlighter
+          ? sanitizeHTML(highlighter
               .codeToHtml(content, { lang: language, theme: theme === 'dark' ? 'github-dark' : 'github-light' })
               .replace(/<\/?pre[^>]*>/g, '')
-              .replace(/<\/?code[^>]*>/g, '')
-          : content;
+              .replace(/<\/?code[^>]*>/g, ''))
+          : sanitizeHTML(content);
         return <span dangerouslySetInnerHTML={{ __html: highlightedCode }} />;
       }
 
@@ -438,14 +455,14 @@ const CodeLine = memo(
             const changeClass = changeColorStyles[change.type];
 
             const highlightedCode = highlighter
-              ? highlighter
+              ? sanitizeHTML(highlighter
                   .codeToHtml(change.value, {
                     lang: language,
                     theme: theme === 'dark' ? 'github-dark' : 'github-light',
                   })
                   .replace(/<\/?pre[^>]*>/g, '')
-                  .replace(/<\/?code[^>]*>/g, '')
-              : change.value;
+                  .replace(/<\/?code[^>]*>/g, ''))
+              : sanitizeHTML(change.value);
 
             return <span key={index} className={changeClass} dangerouslySetInnerHTML={{ __html: highlightedCode }} />;
           })}
