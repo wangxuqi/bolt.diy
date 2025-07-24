@@ -75,9 +75,12 @@ export const action: ActionFunction = async ({ request }) => {
     }
 
     const items = data.Items || [];
-    console.log('阿里云项目原始数据:', JSON.stringify(items, null, 2));
 
     const projects: SupabaseProject[] = items.map((item: any) => {
+      // 确保 URL 有正确的前缀
+      const rawUrl = item.PublicConnectUrl || item.Endpoint || item.Url || item.SupabaseUrl || '';
+      const supabaseUrl = rawUrl && !rawUrl.startsWith('http') ? `http://${rawUrl}` : rawUrl;
+
       const project = {
         id: item.ProjectId,
         name: item.ProjectName,
@@ -87,9 +90,8 @@ export const action: ActionFunction = async ({ request }) => {
         status: item.Status,
 
         // 添加 supabaseUrl 字段，从阿里云返回的数据中获取
-        supabaseUrl: item.PublicConnectUrl || item.Endpoint || item.Url || item.SupabaseUrl || '',
+        supabaseUrl,
       };
-      console.log('处理后的项目数据:', JSON.stringify(project, null, 2));
 
       return project;
     });

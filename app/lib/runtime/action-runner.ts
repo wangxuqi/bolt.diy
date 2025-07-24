@@ -91,11 +91,14 @@ export class ActionRunner {
   addAction(data: ActionCallbackData) {
     const { actionId } = data;
 
+    logger.debug(`[ActionRunner] Adding action ${actionId} of type ${data.action.type}`, { data });
+
     const actions = this.actions.get();
     const action = actions[actionId];
 
     if (action) {
       // action already added
+      logger.debug(`[ActionRunner] Action ${actionId} already exists`);
       return;
     }
 
@@ -151,23 +154,32 @@ export class ActionRunner {
   async #executeAction(actionId: string, isStreaming: boolean = false) {
     const action = this.actions.get()[actionId];
 
+    logger.debug(`[ActionRunner] Executing action ${actionId} of type ${action.type}`, { action });
+
     this.#updateAction(actionId, { status: 'running' });
 
     try {
       switch (action.type) {
         case 'shell': {
+          logger.debug(`[ActionRunner] Handling shell action ${actionId}`);
           await this.#runShellAction(action);
+          logger.debug(`[ActionRunner] Completed shell action ${actionId}`);
           break;
         }
         case 'file': {
+          logger.debug(`[ActionRunner] Handling file action ${actionId}`);
           await this.#runFileAction(action);
+          logger.debug(`[ActionRunner] Completed file action ${actionId}`);
           break;
         }
         case 'supabase': {
+          logger.debug(`[ActionRunner] Handling supabase action ${actionId}`);
+
           try {
             await this.handleSupabaseAction(action as SupabaseAction);
+            logger.debug(`[ActionRunner] Completed supabase action ${actionId}`);
           } catch (error: any) {
-            // Update action status
+            logger.error(`[ActionRunner] Supabase action ${actionId} failed:`, error);
             this.#updateAction(actionId, {
               status: 'failed',
               error: error instanceof Error ? error.message : 'Supabase action failed',
@@ -179,17 +191,25 @@ export class ActionRunner {
           break;
         }
         case 'build': {
+          logger.debug(`[ActionRunner] Handling build action ${actionId}`);
+
           const buildOutput = await this.#runBuildAction(action);
 
           // Store build output for deployment
           this.buildOutput = buildOutput;
+          logger.debug(`[ActionRunner] Completed build action ${actionId}`);
           break;
         }
         case 'start': {
+          logger.debug(`[ActionRunner] Handling start action ${actionId}`);
+
           // making the start app non blocking
 
           this.#runStartAction(action)
-            .then(() => this.#updateAction(actionId, { status: 'complete' }))
+            .then(() => {
+              this.#updateAction(actionId, { status: 'complete' });
+              logger.debug(`[ActionRunner] Completed start action ${actionId}`);
+            })
             .catch((err: Error) => {
               if (action.abortSignal.aborted) {
                 return;

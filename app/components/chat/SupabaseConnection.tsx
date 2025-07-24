@@ -63,16 +63,16 @@ export function SupabaseConnection() {
   }, [currentChatId, supabaseConn.selectedProjectId]);
 
   useEffect(() => {
-    if (isConnected && supabaseConn.token) {
-      fetchSupabaseStats(supabaseConn.token).catch(console.error);
+    if (isConnected) {
+      fetchSupabaseStats().catch(console.error);
     }
-  }, [isConnected, supabaseConn.token]);
+  }, [isConnected]);
 
   useEffect(() => {
-    if (isConnected && supabaseConn.selectedProjectId && supabaseConn.token && !supabaseConn.credentials) {
+    if (isConnected && supabaseConn.selectedProjectId && !supabaseConn.credentials) {
       fetchProjectApiKeys(supabaseConn.selectedProjectId).catch(console.error);
     }
-  }, [isConnected, supabaseConn.selectedProjectId, supabaseConn.token, supabaseConn.credentials]);
+  }, [isConnected, supabaseConn.selectedProjectId, supabaseConn.credentials]);
 
   return (
     <div className="relative">
@@ -99,7 +99,7 @@ export function SupabaseConnection() {
       <DialogRoot open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         {isDialogOpen && (
           <Dialog className="max-w-[520px] p-6">
-            {!isConnected ? (
+            {!isConnected && !isProjectsExpanded ? (
               <div className="space-y-4">
                 <DialogTitle>
                   <img
@@ -119,7 +119,14 @@ export function SupabaseConnection() {
                     <DialogButton type="secondary">Cancel</DialogButton>
                   </DialogClose>
                   <button
-                    onClick={handleConnect}
+                    onClick={async () => {
+                      const result = await handleConnect();
+
+                      if (result) {
+                        setIsProjectsExpanded(true); // 连接成功后展开项目列表
+                        setIsDialogOpen(false); // 关闭连接对话框
+                      }
+                    }}
                     disabled={connecting}
                     className={classNames(
                       'px-4 py-2 rounded-lg text-sm flex items-center gap-2',
@@ -187,7 +194,9 @@ export function SupabaseConnection() {
                       </button>
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => fetchSupabaseStats(supabaseConn.token)}
+                          onClick={() => {
+                            fetchSupabaseStats();
+                          }}
                           className="px-2 py-1 rounded-md text-xs bg-[#F0F0F0] dark:bg-[#252525] text-bolt-elements-textSecondary hover:bg-[#E5E5E5] dark:hover:bg-[#333333] flex items-center gap-1"
                           title="Refresh projects list"
                         >

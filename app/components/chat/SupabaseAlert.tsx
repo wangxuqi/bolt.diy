@@ -3,7 +3,7 @@ import type { SupabaseAlert } from '~/types/actions';
 import { classNames } from '~/utils/classNames';
 import { supabaseConnection } from '~/lib/stores/supabase';
 import { useStore } from '@nanostores/react';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 interface Props {
   alert: SupabaseAlert;
@@ -16,7 +16,6 @@ export function SupabaseChatAlert({ alert, clearAlert, postMessage }: Props) {
   const connection = useStore(supabaseConnection);
   const [isExecuting, setIsExecuting] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true);
-  const [hasAutoExecuted, setHasAutoExecuted] = useState(false);
 
   // Determine connection state - 放宽条件，只要有项目选择和 API Keys 就认为已连接
   const isConnected = !!(
@@ -37,27 +36,11 @@ export function SupabaseChatAlert({ alert, clearAlert, postMessage }: Props) {
     fullConnection: connection,
   });
 
-  // Reset auto-execution state when content changes
-  useEffect(() => {
-    setHasAutoExecuted(false);
-  }, [content]);
-
-  // Auto-execute SQL when connection is established
-  useEffect(() => {
-    if (isConnected && !hasAutoExecuted && content) {
-      console.log('连接建立，自动执行 SQL');
-      setHasAutoExecuted(true);
-      executeSupabaseAction(content);
-    }
-  }, [isConnected, hasAutoExecuted, content]);
-
   // Set title and description based on connection state
   const title = isConnected ? 'Supabase Query' : 'Supabase Connection Required';
   const description = isConnected ? 'Execute database query' : 'Supabase connection required';
   const message = isConnected
-    ? hasAutoExecuted
-      ? 'SQL is being executed automatically...'
-      : 'Please review the proposed changes and apply them to your database.'
+    ? 'Please review the proposed changes and apply them to your database.'
     : 'Please connect to Supabase to continue with this operation.';
 
   const handleConnectClick = () => {
@@ -67,7 +50,7 @@ export function SupabaseChatAlert({ alert, clearAlert, postMessage }: Props) {
 
   // Determine if we should show the Connect button or Apply Changes button
   const showConnectButton = !isConnected;
-  const showApplyButton = isConnected && !hasAutoExecuted;
+  const showApplyButton = isConnected;
 
   const executeSupabaseAction = async (sql: string) => {
     if (!connection.selectedProjectId) {
@@ -95,6 +78,8 @@ export function SupabaseChatAlert({ alert, clearAlert, postMessage }: Props) {
         body: JSON.stringify({
           query: sql,
           projectId: connection.selectedProjectId,
+          supabaseUrl: connection.credentials.supabaseUrl,
+          serviceRoleKey: connection.credentials.serviceRoleKey,
         }),
       });
 

@@ -25,8 +25,6 @@ export interface SupabaseConnectionState {
   isConnected?: boolean;
   project?: SupabaseProject;
   credentials?: SupabaseCredentials;
-  accessKey?: string; // 新增
-  accessSecret?: string; // 新增
 }
 
 const savedConnection = typeof localStorage !== 'undefined' ? localStorage.getItem('supabase_connection') : null;
@@ -53,8 +51,8 @@ if (savedCredentials && !initialState.credentials) {
 
 export const supabaseConnection = atom<SupabaseConnectionState>(initialState);
 
-if (initialState.token && !initialState.stats) {
-  fetchSupabaseStats(initialState.token).catch(console.error);
+if (!initialState.stats) {
+  fetchSupabaseStats().catch(console.error);
 }
 
 export const isConnecting = atom(false);
@@ -64,23 +62,12 @@ export const isFetchingApiKeys = atom(false);
 export function updateSupabaseConnection(connection: Partial<SupabaseConnectionState>) {
   const currentState = supabaseConnection.get();
 
-  console.log('=== updateSupabaseConnection 开始 ===');
-  console.log('当前状态:', JSON.stringify(currentState, null, 2));
-  console.log('更新数据:', JSON.stringify(connection, null, 2));
-
-  // 新增：accessKey/accessSecret 合并
-  if (connection.accessKey === undefined) {
-    connection.accessKey = currentState.accessKey;
-  }
-
-  if (connection.accessSecret === undefined) {
-    connection.accessSecret = currentState.accessSecret;
-  }
-
-  if (connection.user !== undefined || connection.token !== undefined) {
+  // Update isConnected when user, token, or selectedProjectId changes
+  if (connection.user !== undefined || connection.selectedProjectId !== undefined) {
     const newUser = connection.user !== undefined ? connection.user : currentState.user;
-    const newToken = connection.token !== undefined ? connection.token : currentState.token;
-    connection.isConnected = !!(newUser && newToken);
+    const newSelectedProjectId =
+      connection.selectedProjectId !== undefined ? connection.selectedProjectId : currentState.selectedProjectId;
+    connection.isConnected = !!(newUser && newSelectedProjectId);
   }
 
   if (connection.selectedProjectId !== undefined) {
@@ -118,9 +105,7 @@ export function updateSupabaseConnection(connection: Partial<SupabaseConnectionS
     connection.user ||
     connection.token ||
     connection.selectedProjectId !== undefined ||
-    connection.credentials ||
-    connection.accessKey ||
-    connection.accessSecret
+    connection.credentials !== undefined
   ) {
     localStorage.setItem('supabase_connection', JSON.stringify(newState));
 
@@ -135,7 +120,7 @@ export function updateSupabaseConnection(connection: Partial<SupabaseConnectionS
   }
 }
 
-export async function fetchSupabaseStats(token: string) {
+export async function fetchSupabaseStats() {
   isFetchingStats.set(true);
 
   try {
@@ -145,9 +130,7 @@ export async function fetchSupabaseStats(token: string) {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        token,
-      }),
+      body: JSON.stringify(''),
     });
 
     if (!response.ok) {
@@ -172,9 +155,6 @@ export async function fetchProjectApiKeys(projectId: string) {
   isFetchingApiKeys.set(true);
 
   try {
-    console.log('=== fetchProjectApiKeys 开始 ===');
-    console.log('项目ID:', projectId);
-
     // 1. 从项目数据中获取 supabaseUrl
     const currentState = supabaseConnection.get();
     console.log('当前连接状态:', JSON.stringify(currentState, null, 2));
@@ -182,7 +162,9 @@ export async function fetchProjectApiKeys(projectId: string) {
     const project = currentState.stats?.projects?.find((p) => p.id === projectId);
     console.log('找到的项目:', JSON.stringify(project, null, 2));
 
-    const supabaseUrl = project?.supabaseUrl || '';
+    // 确保 URL 有正确的前缀
+    const rawUrl = project?.supabaseUrl || '';
+    const supabaseUrl = rawUrl && !rawUrl.startsWith('http') ? `http://${rawUrl}` : rawUrl;
     console.log('提取的 supabaseUrl:', supabaseUrl);
 
     if (!supabaseUrl) {
@@ -192,7 +174,7 @@ export async function fetchProjectApiKeys(projectId: string) {
     // 2. 调用后端接口获取API Keys
     console.log('调用 /api/supabase/apikeys 接口...');
 
-    const response = await fetch('/api/supabase/apikeys', {
+    const response = await fetch('/api/supabase/variables', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

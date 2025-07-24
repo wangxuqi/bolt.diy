@@ -43,18 +43,12 @@ export function useSupabaseConnection() {
     isConnecting.set(true);
 
     try {
-      const cleanAccessKey = (connection.accessKey || '').trim();
-      const cleanAccessSecret = (connection.accessSecret || '').trim();
-
       const response = await fetch('/api/supabase', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          accessKey: cleanAccessKey,
-          accessSecret: cleanAccessSecret,
-        }),
+        body: JSON.stringify(''),
       });
 
       const data = (await response.json()) as any;
@@ -65,8 +59,6 @@ export function useSupabaseConnection() {
 
       updateSupabaseConnection({
         user: data.user,
-        accessKey: connection.accessKey,
-        accessSecret: connection.accessSecret,
         stats: data.stats,
       });
 

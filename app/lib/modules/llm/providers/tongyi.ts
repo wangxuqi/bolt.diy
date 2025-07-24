@@ -13,12 +13,23 @@ export default class TongyiProvider extends BaseProvider {
   };
 
   staticModels: ModelInfo[] = [
+    { name: 'qwen3-coder-plus', label: 'qwen3-coder-plus', provider: 'Tongyi', maxTokenAllowed: 8000 },
+    {
+      name: 'qwen3-coder-plus-2025-07-22',
+      label: 'qwen3-coder-plus-2025-07-22',
+      provider: 'Tongyi',
+      maxTokenAllowed: 8000,
+    },
     { name: 'qwen-max-latest', label: 'qwen-max-latest', provider: 'Tongyi', maxTokenAllowed: 8000 },
-    { name: 'qwen-coder-plus', label: 'qwen-coder-plus', provider: 'Tongyi', maxTokenAllowed: 8000 },
     { name: 'deepseek-r1', label: 'deepseek-r1', provider: 'Tongyi', maxTokenAllowed: 8000 },
     { name: 'deepseek-v3', label: 'deepseek-v3', provider: 'Tongyi', maxTokenAllowed: 8000 },
     { name: 'qwen-plus-latest', label: 'qwen-plus-latest', provider: 'Tongyi', maxTokenAllowed: 8000 },
-    { name: 'qwen-plus-2025-04-28', label: 'qwen-plus-2025-04-28', provider: 'Tongyi', maxTokenAllowed: 8000 },
+    {
+      name: 'Moonshot-Kimi-K2-Instruct',
+      label: 'Moonshot-Kimi-K2-Instruct',
+      provider: 'Tongyi',
+      maxTokenAllowed: 8000,
+    },
   ];
 
   async getDynamicModels(
@@ -38,7 +49,7 @@ export default class TongyiProvider extends BaseProvider {
       throw `Missing Api Key configuration for ${this.name} provider`;
     }
 
-    const response = await fetch(`https://dashscope.aliyuncs.com/compatible-mode/v1`, {
+    const response = await fetch(`https://dashscope.aliyuncs.com/compatible-mode/v1/models`, {
       headers: {
         Authorization: `Bearer ${apiKey}`,
       },
@@ -50,13 +61,18 @@ export default class TongyiProvider extends BaseProvider {
     const data = res.data.filter(
       (model: any) =>
         model.object === 'model' &&
-        (model.id.startsWith('qwq-') || model.id.startsWith('qwen-') || model.id.startsWith('deepseek-')) &&
+        (model.id.startsWith('Moonshot') || model.id.startsWith('qwen3-coder')) &&
         !staticModelIds.includes(model.id),
     );
 
-    return data.map((m: any) => ({
+    // Sort models by creation date in descending order (newest first)
+    const sortedData = data.sort((a: any, b: any) => {
+      return b.created - a.created;
+    });
+
+    return sortedData.map((m: any) => ({
       name: m.id,
-      label: `${m.id}`,
+      label: m.id,
       provider: this.name,
       maxTokenAllowed: m.context_window || 32000,
     }));
