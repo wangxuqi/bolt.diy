@@ -134,6 +134,10 @@ export const ChatImpl = memo(
       (project) => project.id === supabaseConn.selectedProjectId,
     );
     const supabaseAlert = useStore(workbenchStore.supabaseAlert);
+    const artifacts = useStore(workbenchStore.artifacts);
+    const firstArtifactId = workbenchStore.artifactIdList[0];
+    const firstArtifact = firstArtifactId ? artifacts[firstArtifactId] : undefined;
+    const actionRunner = firstArtifact?.runner;
     const { activeProviders, promptId, autoSelectTemplate, contextOptimizationEnabled } = useSettings();
     const [model, setModel] = useState(() => {
       const savedModel = Cookies.get('selectedModel');
@@ -195,16 +199,51 @@ export const ChatImpl = memo(
         const usage = response.usage;
         setData(undefined);
 
+        // Log the entire response object for debugging
+        console.log('Full onFinish response:', response);
+
+        // Log input and output messages
+        const lastUserMessage = messages.filter((m) => m.role === 'user').slice(-1)[0];
+
+        if (lastUserMessage) {
+          console.log('Chat Input:', lastUserMessage.content);
+          logStore.logProvider('Chat input message', {
+            component: 'Chat',
+            action: 'input',
+            model,
+            provider: provider.name,
+            message: lastUserMessage.content,
+          });
+        }
+
+        console.log('Chat Output:', message.content);
+        logStore.logProvider('Chat output message', {
+          component: 'Chat',
+          action: 'output',
+          model,
+          provider: provider.name,
+          message: message.content,
+        });
+
         if (usage) {
-          console.log('Token usage:', usage);
+          // Handle NaN values in usage data
+          const cleanUsage = {
+            completionTokens: isNaN(usage.completionTokens) ? 0 : usage.completionTokens,
+            promptTokens: isNaN(usage.promptTokens) ? 0 : usage.promptTokens,
+            totalTokens: isNaN(usage.totalTokens) ? 0 : usage.totalTokens,
+          };
+
+          console.log('Token usage:', cleanUsage);
           logStore.logProvider('Chat response completed', {
             component: 'Chat',
             action: 'response',
             model,
             provider: provider.name,
-            usage,
+            usage: cleanUsage,
             messageLength: message.content.length,
           });
+        } else {
+          console.log('No usage data found in response');
         }
 
         logger.debug('Finished streaming');
@@ -215,7 +254,7 @@ export const ChatImpl = memo(
     useEffect(() => {
       const prompt = searchParams.get('prompt');
 
-      // console.log(prompt, searchParams, model, provider);
+      console.log(prompt, searchParams, model, provider);
 
       if (prompt) {
         setSearchParams({});
@@ -579,6 +618,7 @@ export const ChatImpl = memo(
         setDesignScheme={setDesignScheme}
         selectedElement={selectedElement}
         setSelectedElement={setSelectedElement}
+        actionRunner={actionRunner}
       />
     );
   },

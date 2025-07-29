@@ -43,7 +43,11 @@ if (!import.meta.env.SSR) {
           console.log('WebContainer preview message:', message);
 
           // Handle both uncaught exceptions and unhandled promise rejections
-          if (message.type === 'PREVIEW_UNCAUGHT_EXCEPTION' || message.type === 'PREVIEW_UNHANDLED_REJECTION') {
+          if (
+            message.type === 'PREVIEW_UNCAUGHT_EXCEPTION' ||
+            message.type === 'PREVIEW_UNHANDLED_REJECTION' ||
+            message.type === 'PREVIEW_CONSOLE_ERROR'
+          ) {
             const isPromise = message.type === 'PREVIEW_UNHANDLED_REJECTION';
             const title = isPromise ? 'Unhandled Promise Rejection' : 'Uncaught Exception';
             workbenchStore.actionAlert.set({

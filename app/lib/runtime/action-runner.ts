@@ -154,8 +154,6 @@ export class ActionRunner {
   async #executeAction(actionId: string, isStreaming: boolean = false) {
     const action = this.actions.get()[actionId];
 
-    logger.debug(`[ActionRunner] Executing action ${actionId} of type ${action.type}`, { action });
-
     this.#updateAction(actionId, { status: 'running' });
 
     try {
@@ -176,8 +174,12 @@ export class ActionRunner {
           logger.debug(`[ActionRunner] Handling supabase action ${actionId}`);
 
           try {
-            await this.handleSupabaseAction(action as SupabaseAction);
-            logger.debug(`[ActionRunner] Completed supabase action ${actionId}`);
+            const result = await this.handleSupabaseAction(action as SupabaseAction, actionId);
+
+            // If this is a query action, wait for it to complete
+            if (result.pending && 'promise' in result && result.promise) {
+              await result.promise;
+            }
           } catch (error: any) {
             logger.error(`[ActionRunner] Supabase action ${actionId} failed:`, error);
             this.#updateAction(actionId, {
@@ -206,10 +208,7 @@ export class ActionRunner {
           // making the start app non blocking
 
           this.#runStartAction(action)
-            .then(() => {
-              this.#updateAction(actionId, { status: 'complete' });
-              logger.debug(`[ActionRunner] Completed start action ${actionId}`);
-            })
+            .then(() => this.#updateAction(actionId, { status: 'complete' }))
             .catch((err: Error) => {
               if (action.abortSignal.aborted) {
                 return;
@@ -351,6 +350,17 @@ export class ActionRunner {
 
   #updateAction(id: string, newState: ActionStateUpdate) {
     const actions = this.actions.get();
+    const oldState = actions[id];
+
+    // Log state transitions for better debugging
+    if (oldState && oldState.status !== (newState as any).status) {
+      logger.debug(`[Action State Update]: ${id}`, {
+        type: oldState.type,
+        oldStatus: oldState.status,
+        newStatus: (newState as any).status,
+        newState: { ...oldState, ...newState },
+      });
+    }
 
     this.actions.setKey(id, { ...actions[id], ...newState });
   }
@@ -455,18 +465,15 @@ export class ActionRunner {
       try {
         await webcontainer.fs.readdir(dirPath);
         buildDir = dirPath;
-        logger.debug(`Found build directory: ${buildDir}`);
         break;
-      } catch (error) {
-        // Directory doesn't exist, try the next one
-        logger.debug(`Build directory ${dir} not found, trying next option. ${error}`);
+      } catch {
+        continue;
       }
     }
 
     // If no build directory was found, use the default (dist)
     if (!buildDir) {
       buildDir = nodePath.join(webcontainer.workdir, 'dist');
-      logger.debug(`No build directory found, defaulting to: ${buildDir}`);
     }
 
     return {
@@ -475,14 +482,26 @@ export class ActionRunner {
       output,
     };
   }
-  async handleSupabaseAction(action: SupabaseAction) {
+
+  // Store promises for Supabase actions that are pending execution
+  #pendingSupabaseActions = new Map<string, { resolve: () => void; reject: (error: any) => void }>();
+
+  async handleSupabaseAction(action: SupabaseAction, actionId: string) {
     const { operation, content, filePath } = action;
-    logger.debug('[Supabase Action]:', { operation, filePath, content });
+    logger.debug('[Supabase Action]: Processing Supabase action', {
+      operation,
+      filePath,
+      contentSnippet: content?.substring(0, 100) + (content?.length > 100 ? '...' : ''),
+    });
 
     switch (operation) {
       case 'migration':
+        logger.debug('[Supabase Action]: Handling migration operation', { filePath });
+
         if (!filePath) {
-          throw new Error('Migration requires a filePath');
+          const error = 'Migration requires a filePath';
+          logger.error('[Supabase Action]: Migration error', { error });
+          throw new Error(error);
         }
 
         // Show alert for migration action
@@ -492,6 +511,7 @@ export class ActionRunner {
           description: `Create migration file: ${filePath}`,
           content,
           source: 'supabase',
+          actionId,
         });
 
         // Only create the migration file
@@ -501,9 +521,12 @@ export class ActionRunner {
           content,
           changeSource: 'supabase',
         } as any);
+        logger.debug('[Supabase Action]: Migration file created successfully', { filePath });
         return { success: true };
 
       case 'query': {
+        logger.debug('[Supabase Query Action]: Processing query operation');
+
         // Always show the alert and let the SupabaseAlert component handle connection state
         this.onSupabaseAlert?.({
           type: 'info',
@@ -511,14 +534,59 @@ export class ActionRunner {
           description: 'Execute database query',
           content,
           source: 'supabase',
+          actionId,
         });
 
-        // The actual execution will be triggered from SupabaseChatAlert
-        return { pending: true };
+        /*
+         * Create a promise that will be resolved when the Supabase action is completed
+         * This allows the action runner to wait for the action to complete
+         */
+        const promise = new Promise<void>((resolve, reject) => {
+          this.#pendingSupabaseActions.set(actionId, { resolve, reject });
+        });
+
+        // Log that the query is pending execution
+        logger.debug('[Supabase Query Action]: Query set to pending, waiting for execution in SupabaseChatAlert');
+        logger.debug('[Supabase Query Action]: Note that actual SQL execution happens in SupabaseChatAlert component');
+
+        /*
+         * The actual execution will be triggered from SupabaseChatAlert
+         * Return the promise so the action runner can wait for it
+         */
+        return { pending: true, promise };
       }
 
       default:
+        logger.error('[Supabase Action]: Unknown operation', { operation });
         throw new Error(`Unknown operation: ${operation}`);
+    }
+  }
+
+  /**
+   * Called by SupabaseChatAlert when a Supabase action is completed successfully
+   */
+  notifySupabaseActionSuccess(actionId: string) {
+    logger.debug(`[ActionRunner] Supabase action ${actionId} completed successfully`);
+
+    const pendingAction = this.#pendingSupabaseActions.get(actionId);
+
+    if (pendingAction) {
+      pendingAction.resolve();
+      this.#pendingSupabaseActions.delete(actionId);
+    }
+  }
+
+  /**
+   * Called by SupabaseChatAlert when a Supabase action fails
+   */
+  notifySupabaseActionFailure(actionId: string, error: any) {
+    logger.error(`[ActionRunner] Supabase action ${actionId} failed:`, error);
+
+    const pendingAction = this.#pendingSupabaseActions.get(actionId);
+
+    if (pendingAction) {
+      pendingAction.reject(error);
+      this.#pendingSupabaseActions.delete(actionId);
     }
   }
 
@@ -571,5 +639,14 @@ export class ActionRunner {
       deployStatus: deployStatus as any,
       source: details?.source || 'netlify',
     });
+  }
+
+  /**
+   * Allows external components to update the state of an action
+   * This is particularly useful for Supabase queries that are executed outside the action runner
+   */
+  updateActionState(actionId: string, newState: ActionStateUpdate): void {
+    logger.debug(`[ActionRunner] External update of action state: ${actionId}`, { newState });
+    this.#updateAction(actionId, newState);
   }
 }

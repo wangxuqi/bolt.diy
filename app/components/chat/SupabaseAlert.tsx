@@ -4,14 +4,16 @@ import { classNames } from '~/utils/classNames';
 import { supabaseConnection } from '~/lib/stores/supabase';
 import { useStore } from '@nanostores/react';
 import { useState } from 'react';
+import type { ActionRunner } from '~/lib/runtime/action-runner';
 
 interface Props {
   alert: SupabaseAlert;
   clearAlert: () => void;
   postMessage: (message: string) => void;
+  actionRunner?: ActionRunner;
 }
 
-export function SupabaseChatAlert({ alert, clearAlert, postMessage }: Props) {
+export function SupabaseChatAlert({ alert, clearAlert, postMessage, actionRunner }: Props) {
   const { content } = alert;
   const connection = useStore(supabaseConnection);
   const [isExecuting, setIsExecuting] = useState(false);
@@ -78,9 +80,44 @@ export function SupabaseChatAlert({ alert, clearAlert, postMessage }: Props) {
 
       const result = await response.json();
       console.log('Supabase query executed successfully:', result);
+
+      // Update action state to success and notify action runner if actionRunner and actionId are available
+      console.log('Supabase action success - actionRunner:', actionRunner, 'actionId:', alert.actionId);
+
+      if (actionRunner && alert.actionId) {
+        actionRunner.updateActionState(alert.actionId, { status: 'complete' });
+        actionRunner.notifySupabaseActionSuccess(alert.actionId);
+      }
+
       clearAlert();
     } catch (error) {
       console.error('Failed to execute Supabase action:', error);
+
+      // Log debugging information
+      console.log('Supabase action failure - actionRunner:', actionRunner, 'actionId:', alert.actionId);
+
+      // Update action state to failed and notify action runner if actionRunner and actionId are available
+      if (actionRunner && alert.actionId) {
+        try {
+          actionRunner.updateActionState(alert.actionId, {
+            status: 'failed',
+            error: error instanceof Error ? error.message : String(error),
+          });
+          console.log('Calling notifySupabaseActionFailure for actionId:', alert.actionId);
+          actionRunner.notifySupabaseActionFailure(alert.actionId, error);
+        } catch (notifyError) {
+          console.error('Failed to notify action runner of Supabase action failure:', notifyError);
+        }
+      } else {
+        console.log(
+          'Not notifying action runner because actionRunner:',
+          actionRunner,
+          'or actionId:',
+          alert.actionId,
+          'is missing',
+        );
+      }
+
       postMessage(
         `*Error executing Supabase query please fix and return the query again*\n\`\`\`\n${error instanceof Error ? error.message : String(error)}\n\`\`\`\n`,
       );

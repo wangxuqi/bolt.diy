@@ -32,6 +32,7 @@ export const Artifact = memo(({ messageId }: ArtifactProps) => {
 
   const artifacts = useStore(workbenchStore.artifacts);
   const artifact = artifacts[messageId];
+  const showWorkbench = useStore(workbenchStore.showWorkbench);
 
   const actions = useStore(
     computed(artifact.runner.actions, (actions) => {
@@ -93,7 +94,7 @@ export const Artifact = memo(({ messageId }: ArtifactProps) => {
                 {dynamicTitle}
               </div>
               <div className="w-full w-full text-bolt-elements-textSecondary text-xs mt-0.5">
-                Click to open Workbench
+                {showWorkbench ? '点击关闭工作区' : '点击打开工作区'}
               </div>
             </div>
           </button>
@@ -241,7 +242,7 @@ const ActionList = memo(({ actions }: ActionListProps) => {
                   </div>
                 ) : type === 'shell' ? (
                   <div className="flex items-center w-full min-h-[28px]">
-                    <span className="flex-1">Run command</span>
+                    <span className="flex-1">运行命令</span>
                   </div>
                 ) : type === 'start' ? (
                   <a
@@ -251,7 +252,7 @@ const ActionList = memo(({ actions }: ActionListProps) => {
                     }}
                     className="flex items-center w-full min-h-[28px]"
                   >
-                    <span className="flex-1">Start Application</span>
+                    <span className="flex-1">启动应用</span>
                   </a>
                 ) : null}
               </div>

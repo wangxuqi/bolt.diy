@@ -253,18 +253,61 @@ export class StreamingMessageParser {
             if (openTagEnd !== -1) {
               const artifactTag = input.slice(i, openTagEnd + 1);
 
+              // Add debug logging to see what we're actually parsing
+              logger.debug('Parsing artifact tag:', artifactTag);
+
               const artifactTitle = this.#extractAttribute(artifactTag, 'title') as string;
               const type = this.#extractAttribute(artifactTag, 'type') as string;
               const artifactId = this.#extractAttribute(artifactTag, 'id') as string;
 
-              if (!artifactTitle) {
-                logger.warn('Artifact title missing');
+              // Add debug logging for extracted attributes
+              logger.debug('Extracted attributes - title:', artifactTitle, 'id:', artifactId);
+
+              /*
+               * Check if this might be a partial tag in streaming input
+               * If the tag doesn't contain both title and id, it might be incomplete
+               */
+              const hasTitleAttribute = artifactTag.includes('title=');
+              const hasIdAttribute = artifactTag.includes('id=');
+
+              // If we're missing attributes that should be there, it might be due to partial input
+              if ((!artifactTitle && hasTitleAttribute) || (!artifactId && hasIdAttribute)) {
+                /*
+                 * We can see the attribute exists but couldn't extract its value
+                 * This suggests a malformed attribute, which we should skip
+                 */
+                if (!artifactTitle && hasTitleAttribute) {
+                  logger.warn('Could not extract artifact title from tag:', artifactTag);
+                }
+
+                if (!artifactId && hasIdAttribute) {
+                  logger.warn('Could not extract artifact id from tag:', artifactTag);
+                }
+
+                // Skip the entire artifact tag
+                const artifactCloseIndex = input.indexOf(ARTIFACT_TAG_CLOSE, i);
+
+                if (artifactCloseIndex !== -1) {
+                  i = artifactCloseIndex + ARTIFACT_TAG_CLOSE.length;
+                } else {
+                  // If no closing tag found, skip to end of opening tag
+                  i = openTagEnd + 1;
+                }
+
+                continue;
               }
 
-              if (!artifactId) {
-                logger.warn('Artifact id missing');
+              /*
+               * If the attributes are completely missing (not even the attribute name)
+               * it might be a partial tag, so we should wait for more input
+               */
+              if (!hasTitleAttribute || !hasIdAttribute) {
+                logger.debug('Partial artifact tag detected, waiting for more input:', artifactTag);
+                earlyBreak = true;
+                break;
               }
 
+              // If we get here, we have both attributes with valid values
               state.insideArtifact = true;
 
               const currentArtifact = {

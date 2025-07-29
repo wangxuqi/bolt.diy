@@ -40,7 +40,7 @@ export const action: ActionFunction = async ({ request }) => {
     if (!accessKeyId || !accessKeySecret) {
       return json(
         { error: '请在 .env 文件中配置 ALIBABA_CLOUD_ACCESS_KEY_ID 和 ALIBABA_CLOUD_ACCESS_KEY_SECRET' },
-        { status: 500 },
+        { status: 400 },
       );
     }
 
@@ -68,7 +68,6 @@ export const action: ActionFunction = async ({ request }) => {
     // 发送请求
     const resp = await fetch(url, { method: 'GET' });
     const data = (await resp.json()) as any;
-    console.log('阿里云API原始返回:', JSON.stringify(data, null, 2));
 
     if (!resp.ok || data.Code) {
       return json({ error: data.Message || 'Failed to fetch projects' }, { status: 401 });

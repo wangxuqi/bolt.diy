@@ -58,7 +58,7 @@ Instructions:
 5. If no perfect match exists, recommend the closest option
 
 Important: Provide only the selection tags in your response, no additional text.
-MOST IMPORTANT: YOU DONT HAVE TIME TO THINK JUST START RESPONDING BASED ON HUNCH 
+MOST IMPORTANT: YOU DONT HAVE TIME TO THINK JUST START RESPONDING BASED ON HUNCH
 `;
 
 const templates: Template[] = STARTER_TEMPLATES.filter((t) => !t.name.includes('shadcn'));
@@ -182,7 +182,7 @@ export async function getTemplates(templateName: string, title?: string) {
   }
 
   const assistantMessage = `
-Bolt is initializing your project with the required files using the ${template.name} template.
+  Bolt正在使用${template.name}模版初始化你的项目.
 <boltArtifact id="imported-files" title="${title || 'Create initial files'}" type="bundled">
 ${filesToImport.files
   .map(
@@ -244,6 +244,13 @@ NO NOT EDIT/WRITE ANY FILES THAT ALREADY EXIST IN THE PROJECT AND DOES NOT NEED 
 Now that the Template is imported please continue with my original request
 
 IMPORTANT: Dont Forget to install the dependencies before running the app by using \`npm install && npm run dev\`
+\`npm run dev\` should be run with BoltAction type start.
+极其重要：每次对话生成且只能生成一个 \`<boltArtifact>\` 标签!
+极其重要：\`<boltArtifact>\` 标签必须是完整的!
+极其重要：不要省略任何内容！
+极其重要：先思考，然后回复包含所有必要步骤以设置项目、文件和要运行的 shell 命令的产物。首先回复这个是超级重要的。
+极其重要：如果项目复杂，可以产分成多个阶段Step by Step完成！
+极其重要：supabase的action总是独立使用一次\`<boltArtifact>\`，与其他行为分开，先做完supabase操作，下一次\`<boltArtifact>\`再更新代码！
 `;
 
   return {

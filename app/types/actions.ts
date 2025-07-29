@@ -48,6 +48,7 @@ export interface SupabaseAlert {
   description: string;
   content: string;
   source?: 'supabase';
+  actionId?: string;
 }
 
 export interface DeployAlert {

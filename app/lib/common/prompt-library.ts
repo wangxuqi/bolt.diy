@@ -1,6 +1,6 @@
 import { getSystemPrompt } from './prompts/prompts';
 import optimized from './prompts/optimized';
-import { getFineTunedPrompt } from './prompts/new-prompt';
+import { getChineseFineTunedPrompt } from './prompts/chinese-prompts';
 import type { DesignScheme } from '~/types/design-scheme';
 
 export interface PromptOptions {
@@ -29,8 +29,8 @@ export class PromptLibrary {
   > = {
     default: {
       label: 'Default Prompt',
-      description: 'An fine tuned prompt for better results and less token usage',
-      get: (options) => getFineTunedPrompt(options.cwd, options.supabase, options.designScheme),
+      description: 'An Chinese fine tuned prompt for better results',
+      get: (options) => getChineseFineTunedPrompt(options.cwd, options.supabase),
     },
     original: {
       label: 'Old Default Prompt',

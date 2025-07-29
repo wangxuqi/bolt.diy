@@ -96,8 +96,6 @@ export const action: ActionFunction = async ({ request }) => {
       .join('&');
     const url = `https://gpdb.aliyuncs.com/?${query}`;
 
-    console.log('调用阿里云API获取项目API Keys:', { projectId, regionId, url });
-
     // 发送请求
     const resp = await fetch(url, { method: 'GET' });
 
@@ -130,8 +128,6 @@ export const action: ActionFunction = async ({ request }) => {
         { status: 500 },
       );
     }
-
-    console.log('GetSupabaseProjectApiKeys 阿里云API原始返回:', JSON.stringify(data, null, 2));
 
     // 检查阿里云API业务错误
     if (data.Code) {

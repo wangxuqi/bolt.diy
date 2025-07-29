@@ -33,7 +33,6 @@ export function useSupabaseConnection() {
       updateSupabaseConnection(parsed);
 
       if (parsed.selectedProjectId && !parsed.credentials) {
-        console.log('初始化时自动获取项目 API Keys:', parsed.selectedProjectId);
         fetchProjectApiKeys(parsed.selectedProjectId).catch(console.error);
       }
     }

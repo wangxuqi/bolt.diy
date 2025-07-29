@@ -55,7 +55,8 @@ export const isFetchingApiKeys = atom(false);
 
 export const supabaseConnection = atom<SupabaseConnectionState>(initialState);
 
-if (!initialState.stats) {
+// Only fetch stats on the client side to avoid SSR issues
+if (typeof window !== 'undefined' && !initialState.stats) {
   fetchSupabaseStats().catch(console.error);
 }
 
@@ -95,7 +96,6 @@ export function updateSupabaseConnection(connection: Partial<SupabaseConnectionS
   }
 
   const newState = { ...currentState, ...connection };
-  console.log('更新后的状态:', JSON.stringify(newState, null, 2));
   supabaseConnection.set(newState);
 
   /*
@@ -157,22 +157,16 @@ export async function fetchProjectApiKeys(projectId: string) {
   try {
     // 1. 从项目数据中获取 supabaseUrl
     const currentState = supabaseConnection.get();
-    console.log('当前连接状态:', JSON.stringify(currentState, null, 2));
 
     const project = currentState.stats?.projects?.find((p) => p.id === projectId);
-    console.log('找到的项目:', JSON.stringify(project, null, 2));
 
     // 确保 URL 有正确的前缀
     const rawUrl = project?.supabaseUrl || '';
     const supabaseUrl = rawUrl && !rawUrl.startsWith('http') ? `http://${rawUrl}` : rawUrl;
-    console.log('提取的 supabaseUrl:', supabaseUrl);
 
     if (!supabaseUrl) {
       console.warn('项目数据中没有找到 supabaseUrl，请检查阿里云 API 返回的数据结构');
     }
-
-    // 2. 调用后端接口获取API Keys
-    console.log('调用 /api/supabase/apikeys 接口...');
 
     const response = await fetch('/api/supabase/variables', {
       method: 'POST',
@@ -187,16 +181,9 @@ export async function fetchProjectApiKeys(projectId: string) {
     }
 
     const data = (await response.json()) as any;
-    console.log('API Keys 接口返回:', JSON.stringify(data, null, 2));
 
     const anonKey = data.anonKey;
     const serviceRoleKey = data.serviceRoleKey;
-
-    console.log('准备更新连接状态，credentials:', {
-      anonKey: !!anonKey,
-      serviceRoleKey: !!serviceRoleKey,
-      supabaseUrl: !!supabaseUrl,
-    });
 
     updateSupabaseConnection({
       credentials: {
@@ -205,8 +192,6 @@ export async function fetchProjectApiKeys(projectId: string) {
         supabaseUrl,
       },
     });
-
-    console.log('=== fetchProjectApiKeys 完成 ===');
 
     return { anonKey, serviceRoleKey, supabaseUrl };
   } catch (error) {
