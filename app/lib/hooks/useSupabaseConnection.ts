@@ -118,7 +118,7 @@ export function useSupabaseConnection() {
   };
 
   const handleCreateProject = async () => {
-    const regionId = process.env.ALIBABA_CLOUD_REGION_ID || 'cn-beijing';
+    const regionId = import.meta.env.ALIBABA_CLOUD_REGION_ID || 'cn-beijing';
     window.open(`https://gpdbnext.console.aliyun.com/gpdb/${regionId}/supabase`, '_blank');
   };
 

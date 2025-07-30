@@ -138,6 +138,7 @@ export default defineConfig((config) => {
       'OLLAMA_API_BASE_URL',
       'LMSTUDIO_API_BASE_URL',
       'TOGETHER_API_BASE_URL',
+      'ALIBABA_CLOUD_REGION_ID',
     ],
     css: {
       preprocessorOptions: {
