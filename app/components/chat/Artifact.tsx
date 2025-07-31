@@ -28,6 +28,7 @@ interface ArtifactProps {
 export const Artifact = memo(({ messageId }: ArtifactProps) => {
   const userToggledActions = useRef(false);
   const [showActions, setShowActions] = useState(false);
+  const showWorkbench = useStore(workbenchStore.showWorkbench);
   const [allActionFinished, setAllActionFinished] = useState(false);
 
   const artifacts = useStore(workbenchStore.artifacts);
@@ -93,7 +94,7 @@ export const Artifact = memo(({ messageId }: ArtifactProps) => {
                 {dynamicTitle}
               </div>
               <div className="w-full w-full text-bolt-elements-textSecondary text-xs mt-0.5">
-                Click to open Workbench
+                {showWorkbench ? 'Click to close Workbench' : 'Click to open Workbench'}
               </div>
             </div>
           </button>
